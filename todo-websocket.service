@@ -1,0 +1,16 @@
+[Unit]
+Description=todo websocket
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+Group=root
+WorkingDirectory=/home/emil/dev/todo-websocket
+ExecStart=/usr/bin/node main.js
+
+[Install]
+WantedBy=multi-user.target

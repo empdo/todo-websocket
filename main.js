@@ -1,44 +1,70 @@
-const express = require('express');
-const ws = require('ws');
+'use strict';
+var http = require('http');
+var https = require('https');
+var fs= require('fs');
+var express = require('express');
+var WebSocket = require('ws');
 
-const app = express();
-const wsServer = new ws.Server({ noServer: true });
+var server = {
+  key: fs.readFileSync('/etc/letsencrypt/live/s1.essung.dev/privkey.pem'),
+  cert: fs.readFileSync('/etc/letsencrypt/live/s1.essung.dev/fullchain.pem')
+};
 
+var web = express();
+var verySecretKey = 'alvearenpotatis';
+
+var httpsServer = https.createServer(server, web);
+var wss = new WebSocket.Server({ server: httpsServer });
+
+var whiteList = [];
 var list = [];
-// Set up a headless websocket server that prints any
-// events that come in.
-//
-function coolFunction(message) {
-	list.push(message);
-	fetch();
-}
 
-function fetch(){
-	wsServer.clients.forEach((client) => {
-		if(client.readyState === ws.OPEN){
-			client.send(JSON.stringify(list));
+function coolFunction(message) {                                                
+	try {
+		var parsedJson = JSON.parse(message);
+		if ("text" in parsedJson && "id" in parsedJson) {
+			list.push(parsedJson)
+		}else {
+			throw(TypeError("message does not match criteria"));
 		}
-	})
-}
-
-wsServer.on('connection', socket => {
-  socket.on('message', message => {
-	if (message[0] === "0"){
-		coolFunction(message.slice(1));
-	}else if(message[0] === "1"){
-		fetch();
+	} catch (error) {
+		console.error(error)
 	}
-  });
+    wss.broadcast(JSON.stringify(list))                                                            
+}                                                                               
+									    
+function fetch(){                                                               
+	wss.broadcast(JSON.stringify(list));                      
+} 
+
+wss.broadcast = function broadcast(data) {
+    wss.clients.forEach(function each(client) {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(data);
+        }
+    });
+};
+
+wss.on('connection', function connection(ws, request, client) {
+    ws.on('message', function incoming(message) {
+	if (whiteList.includes(client)){
+		if (message[0] === "0"){                                                
+			coolFunction(message.slice(1));                                 
+		}else if(message[0] === "1"){                                           
+			fetch();                                                        
+		}  	
+	}else if (message[0] === "3"){
+		if (message.slice(1) === verySecretKey){
+			whiteList.push(client)
+		}else {
+			httpsServer.destroy();
+		}
+	}
+
+    });
 });
 
-// `server` is a vanilla Node.js HTTP server, so use
-// the same ws upgrade process described here:
-// https://www.npmjs.com/package/ws#multiple-servers-sharing-a-single-https-server
-const server = app.listen(3000);
-server.on('upgrade', (request, socket, head) => {
-  wsServer.handleUpgrade(request, socket, head, socket => {
-    wsServer.emit('connection', socket, request);
-  });
-});
 
+//Server initializations
 
+httpsServer.listen(3000, function listen(connection) {});
