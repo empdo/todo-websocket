@@ -37,6 +37,16 @@ function fetch(){
 	wss.broadcast(JSON.stringify(list));                      
 } 
 
+function removeItem(id){
+	console.log(id);
+	for (var i = 0; i < list.length; i++) {
+		if (list[i].id === id){
+			list.splice(i, 1)
+		}
+	}
+	fetch();
+}
+
 wss.broadcast = function broadcast(data) {
     wss.clients.forEach(function each(client) {
         if (client.readyState === WebSocket.OPEN) {
@@ -47,17 +57,20 @@ wss.broadcast = function broadcast(data) {
 
 wss.on('connection', function connection(ws, request, client) {
     ws.on('message', function incoming(message) {
-	if (whiteList.includes(client)){
+	if (whiteList.includes(request.socket)){
 		if (message[0] === "0"){                                                
 			coolFunction(message.slice(1));                                 
 		}else if(message[0] === "1"){                                           
 			fetch();                                                        
-		}  	
+		}else if(message[0] === "2"){
+			removeItem(message.slice(1))
+		}
 	}else if (message[0] === "3"){
 		if (message.slice(1) === verySecretKey){
-			whiteList.push(client)
+			whiteList.push(request.socket)
+			console.log(`whitelisted ${request.socket.remoteAddress}`)
 		}else {
-			httpsServer.destroy();
+			request.socket.close(); //stänger ner alla
 		}
 	}
 
